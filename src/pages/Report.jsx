@@ -1,12 +1,10 @@
+
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 import "./Report.css";
-
-
-const ACTIVATION_RATE = 84.746;
-const MANPOWER_RATE = 1186.45;
 
 export default function Report({ onLogout }) {
   const location = useLocation();
@@ -14,7 +12,9 @@ export default function Report({ onLogout }) {
 
   const report = location.state?.report;
 
-  
+  const [downloading, setDownloading] = useState(false);
+
+  // Format currency
   const formatMoney = (value) => {
     if (value === undefined || value === null || value === "") {
       return "-";
@@ -32,7 +32,7 @@ export default function Report({ onLogout }) {
     });
   };
 
-  
+  // Format date
   const formatDate = (value) => {
     if (!value) return "-";
 
@@ -63,30 +63,12 @@ export default function Report({ onLogout }) {
     });
   };
 
-  
-  const eventStart =
-    report?.eventDate ||
-    report?.fromDate ||
-    report?.startDate ||
-    report?.dateFrom;
-
-  const eventEnd =
-    report?.eventEndDate ||
-    report?.toDate ||
-    report?.endDate ||
-    report?.dateTo;
-
-  const dateRange =
-    eventStart && eventEnd
-      ? `${formatDate(eventStart)} to ${formatDate(eventEnd)}`
-      : formatDate(eventStart || eventEnd);
-
   // Print report
   const handlePrint = () => {
     window.print();
   };
 
-  
+  // Download PDF
   const handleDownloadPDF = async () => {
     const reportElement = document.getElementById("report-content");
 
@@ -98,6 +80,7 @@ export default function Report({ onLogout }) {
     let pdfClone;
 
     try {
+      setDownloading(true);
 
       const downloadDateTime = new Date().toLocaleString("en-IN", {
         day: "2-digit",
@@ -109,51 +92,54 @@ export default function Report({ onLogout }) {
         hour12: true,
       });
 
-      const clubName = String(report?.clubName || "Club-Report")
+      const safeClubName = String(report.clubName || "Club-Report")
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
         .trim();
 
-      const eventDate = String(dateRange || "Report").replace(/\s+/g, "-");
+      const safeDateRange = String(dateRange || "Report").replace(
+        /\s+/g,
+        "-"
+      );
 
-      
       pdfClone = reportElement.cloneNode(true);
 
       pdfClone.removeAttribute("id");
 
-      pdfClone.style.width = "460px";
-      pdfClone.style.maxWidth = "460px";
-      pdfClone.style.margin = "0";
-      pdfClone.style.padding = "20px 18px 16px";
-      pdfClone.style.position = "fixed";
-      pdfClone.style.left = "-10000px";
-      pdfClone.style.top = "0";
-      pdfClone.style.background = "#ffffff";
-      pdfClone.style.boxSizing = "border-box";
-      pdfClone.style.height = "auto";
-      pdfClone.style.overflow = "visible";
+      Object.assign(pdfClone.style, {
+        width: "460px",
+        maxWidth: "460px",
+        margin: "0",
+        padding: "20px 18px 16px",
+        position: "fixed",
+        left: "-10000px",
+        top: "0",
+        background: "#ffffff",
+        boxSizing: "border-box",
+        height: "auto",
+        overflow: "visible",
+      });
 
-      
       const downloadInfo = document.createElement("div");
 
       downloadInfo.className = "pdf-download-info";
       downloadInfo.textContent = `Downloaded on: ${downloadDateTime}`;
 
-      downloadInfo.style.display = "block";
-      downloadInfo.style.width = "100%";
-      downloadInfo.style.marginTop = "8px";
-      downloadInfo.style.paddingTop = "6px";
-      downloadInfo.style.textAlign = "center";
-      downloadInfo.style.fontSize = "9px";
-      downloadInfo.style.lineHeight = "1.5";
-      downloadInfo.style.color = "#555";
-      downloadInfo.style.background = "#ffffff";
-      downloadInfo.style.boxSizing = "border-box";
+      Object.assign(downloadInfo.style, {
+        display: "block",
+        width: "100%",
+        marginTop: "8px",
+        paddingTop: "6px",
+        textAlign: "center",
+        fontSize: "9px",
+        lineHeight: "1.5",
+        color: "#555",
+        background: "#ffffff",
+        boxSizing: "border-box",
+      });
 
       pdfClone.appendChild(downloadInfo);
-
       document.body.appendChild(pdfClone);
 
-      
       const images = Array.from(pdfClone.querySelectorAll("img"));
 
       await Promise.all(
@@ -169,7 +155,6 @@ export default function Report({ onLogout }) {
         })
       );
 
-      
       const canvas = await html2canvas(pdfClone, {
         scale: 2,
         useCORS: true,
@@ -195,7 +180,6 @@ export default function Report({ onLogout }) {
       const availableWidth = pageWidth - margin * 2;
       const availableHeight = pageHeight - margin * 2;
 
-      
       const scale = Math.min(
         availableWidth / canvas.width,
         availableHeight / canvas.height
@@ -218,8 +202,7 @@ export default function Report({ onLogout }) {
         "FAST"
       );
 
-      // Download PDF
-      pdf.save(`${clubName}-${eventDate}.pdf`);
+      pdf.save(`${safeClubName}-${safeDateRange}.pdf`);
     } catch (error) {
       console.error("PDF download failed:", error);
       alert("Unable to download the PDF. Please try again.");
@@ -227,10 +210,12 @@ export default function Report({ onLogout }) {
       if (pdfClone?.parentNode) {
         pdfClone.parentNode.removeChild(pdfClone);
       }
+
+      setDownloading(false);
     }
   };
 
-  
+  // Handle missing report
   if (!report) {
     return (
       <div className="report-page">
@@ -258,46 +243,112 @@ export default function Report({ onLogout }) {
     );
   }
 
-  
-  const activations = Number(
-    report.activations ?? report.activationQuantity ?? 0
+  // Event dates
+  const eventStart =
+    report.eventDate ||
+    report.fromDate ||
+    report.startDate ||
+    report.dateFrom;
+
+  const eventEnd =
+    report.eventEndDate ||
+    report.toDate ||
+    report.endDate ||
+    report.dateTo;
+
+  const dateRange =
+    eventStart && eventEnd
+      ? `${formatDate(eventStart)} to ${formatDate(eventEnd)}`
+      : formatDate(eventStart || eventEnd);
+
+  // Convert values to numbers safely
+  const toNumber = (value, fallback = 0) => {
+    if (value === undefined || value === null || value === "") {
+      return fallback;
+    }
+
+    const number = Number(value);
+
+    return Number.isFinite(number) ? number : fallback;
+  };
+
+  // Round money to two decimal places
+  const roundMoney = (amount) =>
+    Math.round((amount + Number.EPSILON) * 100) / 100;
+
+  // Quantities
+  const activations = toNumber(
+    report.activations ?? report.activationQuantity
   );
 
-  const manPower = Number(
-    report.manPower ?? report.manpower ?? report.manPowerQuantity ?? 0
+  const manPower = toNumber(
+    report.manPower ??
+      report.manpower ??
+      report.manPowerQuantity
   );
 
-  // Fixed rates
-  const activationRate = Number(
-    report.activationRate ?? ACTIVATION_RATE
+  // Rates saved with this particular report
+  const activationRate = toNumber(report.activationRate);
+  const manpowerRate = toNumber(
+    report.manpowerRate ?? report.manPowerRate
+  );
+  const licenceFeeRate = toNumber(report.licenceFeeRate);
+  const gstRate = toNumber(report.gstRate, 18);
+
+  // Basic amounts
+  const topups = toNumber(report.topups ?? report.topUps);
+  const sales = toNumber(report.sales);
+  const card = toNumber(report.card);
+  const cash = toNumber(report.cash);
+  const upi = toNumber(report.upi);
+
+  // Log the actual report rates for debugging
+  console.log("Report ID:", report._id);
+  console.log("Report rates from selected MongoDB record:", {
+    activationRate,
+    manpowerRate,
+    licenceFeeRate,
+    gstRate,
+  });
+
+  // Calculate amounts using the selected report's saved rates
+  const activationAmount = roundMoney(
+    activations * activationRate
   );
 
-  const manpowerRate = Number(
-    report.manpowerRate ?? MANPOWER_RATE
+  const manpowerAmount = roundMoney(
+    manPower * manpowerRate
   );
 
-  
-  const activationAmount =
-    report.activationAmount !== undefined &&
-    report.activationAmount !== null
-      ? Number(report.activationAmount)
-      : Number((activations * activationRate).toFixed(2));
+  const licenceFee = roundMoney(
+    topups * (licenceFeeRate / 100)
+  );
 
-  const manpowerAmount =
-    report.manpowerAmount !== undefined &&
-    report.manpowerAmount !== null
-      ? Number(report.manpowerAmount)
-      : Number((manPower * manpowerRate).toFixed(2));
+  const paymentsTotal = roundMoney(
+    report.paymentsTotal ??
+      report.subTotalPayments ??
+      card + cash + upi
+  );
 
-  // Summary section
+  const subTotal = roundMoney(
+    licenceFee + activationAmount + manpowerAmount
+  );
+
+  const gst = roundMoney(subTotal * (gstRate / 100));
+
+  const invoiceTotal = roundMoney(subTotal + gst);
+
+  const payable = roundMoney(topups - cash - invoiceTotal);
+
+  // Summary
   const summaryItems = [
     {
       label: "TOPUPS",
-      value: report.topups ?? report.topUps,
+      value: topups,
     },
     {
       label: "SALES",
-      value: report.sales,
+      value: sales,
     },
     {
       label: "DEVICES",
@@ -311,28 +362,28 @@ export default function Report({ onLogout }) {
     },
     {
       label: "BREAKAGE",
-      value: report.breakage,
+      value:
+        report.breakage ??
+        roundMoney(topups - sales - activationAmount),
       description:
-        report.breakageDescription || "Topups - Sales - Activations",
+        report.breakageDescription ||
+        "Topups - Sales - Activation Amount",
     },
   ];
 
-
-  const paymentsTotal =
-    report.paymentsTotal ?? report.subTotalPayments;
-
+  // Payments
   const paymentItems = [
     {
       label: "CARD",
-      value: report.card,
+      value: card,
     },
     {
       label: "CASH (HANDOVER)",
-      value: report.cash,
+      value: cash,
     },
     {
       label: "UPI",
-      value: report.upi,
+      value: upi,
     },
     {
       label: "SUB TOTAL",
@@ -346,13 +397,12 @@ export default function Report({ onLogout }) {
     },
   ];
 
-  // Invoice section
+  // Invoice
   const invoiceItems = [
     {
       label: "LICENCE FEE",
-      value: report.licenceFee,
-      description:
-        report.licenceFeeDescription || "1.1% of Total Topup",
+      value: licenceFee,
+      description: `${licenceFeeRate}% of Total Topups`,
     },
     {
       label: "ACTIVATIONS",
@@ -360,10 +410,10 @@ export default function Report({ onLogout }) {
       description: `${activations} activations × ₹${activationRate.toLocaleString(
         "en-IN",
         {
-          minimumFractionDigits: 3,
+          minimumFractionDigits: 2,
           maximumFractionDigits: 3,
         }
-      )}`,
+      )} per activation`,
     },
     {
       label: "MANPOWER",
@@ -374,26 +424,26 @@ export default function Report({ onLogout }) {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }
-      )}`,
+      )} per manpower`,
     },
     {
       label: "SUB TOTAL",
-      value: report.subTotal,
+      value: subTotal,
       total: true,
     },
     {
       label: "GST",
-      value: report.gst,
-      description: "18%",
+      value: gst,
+      description: `${gstRate}% of Subtotal`,
     },
     {
       label: "TOTAL",
-      value: report.invoiceTotal,
+      value: invoiceTotal,
       total: true,
     },
   ];
 
-  
+  // Render amount
   const renderAmount = (item) => {
     if (
       item.value === undefined ||
@@ -410,7 +460,6 @@ export default function Report({ onLogout }) {
 
   return (
     <div className="report-page">
-      
       <header className="report-header no-print">
         <h2>Club Management</h2>
 
@@ -421,8 +470,12 @@ export default function Report({ onLogout }) {
             Print Report
           </button>
 
-          <button type="button" onClick={handleDownloadPDF}>
-            Download PDF
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+          >
+            {downloading ? "Preparing PDF..." : "Download PDF"}
           </button>
 
           {onLogout && (
@@ -433,14 +486,10 @@ export default function Report({ onLogout }) {
         </nav>
       </header>
 
-
       <main id="report-content" className="payslip">
-
         <div className="payslip-brand">
           <div className="combined-logo">
             <div className="paynthra-name">PayNthra</div>
-
-          
           </div>
         </div>
 
@@ -461,7 +510,6 @@ export default function Report({ onLogout }) {
           </thead>
 
           <tbody>
-            
             {summaryItems.map((item) => (
               <tr key={item.label}>
                 <td>
@@ -480,7 +528,6 @@ export default function Report({ onLogout }) {
               </tr>
             ))}
 
-
             <tr className="section-heading">
               <th colSpan="2">AMOUNT WITH payNthra</th>
             </tr>
@@ -497,7 +544,6 @@ export default function Report({ onLogout }) {
                 </td>
               </tr>
             ))}
-
 
             <tr className="section-heading">
               <th colSpan="2">INVOICE</th>
@@ -524,19 +570,15 @@ export default function Report({ onLogout }) {
               </tr>
             ))}
 
-
             <tr className="payable-row">
               <td>PAYABLE</td>
 
               <td className="report-amount">
-                {renderAmount({
-                  value: report.payable,
-                })}
+                {renderAmount({ value: payable })}
               </td>
             </tr>
           </tbody>
         </table>
-
 
         <footer className="payslip-footer">
           <div className="payslip-confidential">
@@ -556,7 +598,6 @@ export default function Report({ onLogout }) {
         </footer>
       </main>
 
-      
       <div className="report-bottom-actions no-print">
         <Link to="/admin" className="report-back-link">
           Back to Report History

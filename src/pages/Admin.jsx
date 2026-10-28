@@ -1,17 +1,12 @@
 
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import "./Admin.css";
 
 export default function Admin({ onLogout }) {
   const navigate = useNavigate();
 
-  
-  const ACTIVATION_RATE = 84.746;
-  const MANPOWER_RATE = 1186.45;
-
-  
   const [clubName, setClubName] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
@@ -26,64 +21,82 @@ export default function Admin({ onLogout }) {
   const [cash, setCash] = useState("");
   const [upi, setUpi] = useState("");
 
-  
   const [activations, setActivations] = useState("");
+  const [activationRate, setActivationRate] = useState("");
+
   const [manPower, setManPower] = useState("");
+  const [manpowerRate, setManpowerRate] = useState("");
+
+  const [licenceFeeRate, setLicenceFeeRate] = useState("");
+  const [gstRate, setGstRate] = useState("18");
 
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  
-
+  // Logout
   const handleLogout = async () => {
     try {
       await api.post("/logout");
     } catch (error) {
-      console.error("Logout API error:", error);
+      console.error(
+        "Logout API error:",
+        error.response?.data || error.message
+      );
     } finally {
-      
       sessionStorage.removeItem("isLoggedIn");
       localStorage.removeItem("accessToken");
       localStorage.removeItem("userRole");
 
-      
       if (onLogout) {
         onLogout();
       } else {
-
         navigate("/login", { replace: true });
       }
     }
   };
 
-  
-
-  const fetchHistory = async () => {
+  // Fetch report history
+  const fetchHistory = useCallback(async () => {
     try {
       setHistoryLoading(true);
 
       const response = await api.get("/admin");
 
-      if (response.data.success) {
-        setHistory(response.data.data || []);
+      if (response.data?.success) {
+        const reports =
+          response.data.reports ?? response.data.data;
+
+        setHistory(Array.isArray(reports) ? reports : []);
       } else {
         setHistory([]);
+        console.error(
+          "History response:",
+          response.data?.message || "Unable to fetch reports."
+        );
       }
     } catch (error) {
-      console.error("Fetch history error:", error);
-      alert("Unable to fetch report history.");
+      console.error(
+        "Fetch history error:",
+        error.response?.data || error.message
+      );
+
+      setHistory([]);
+
+      alert(
+        error.response?.data?.message ||
+          "Unable to fetch report history. Please check the server connection."
+      );
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
-  
-
+  // Reset form
   const resetForm = () => {
     setClubName("");
     setEventDate("");
@@ -100,11 +113,16 @@ export default function Admin({ onLogout }) {
     setUpi("");
 
     setActivations("");
+    setActivationRate("");
+
     setManPower("");
+    setManpowerRate("");
+
+    setLicenceFeeRate("");
+    setGstRate("18");
   };
 
-  
-
+  // Create report
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -115,31 +133,63 @@ export default function Admin({ onLogout }) {
       !eventEndDate
     ) {
       alert(
-        "Please fill in the club name, event ID, start date, and end date."
+        "Please enter the club name, event ID, start date, and end date."
       );
       return;
     }
 
-    if (new Date(eventEndDate) < new Date(eventDate)) {
+    // Validate dates
+    const startDate = new Date(`${eventDate}T00:00:00`);
+    const endDate = new Date(`${eventEndDate}T00:00:00`);
+
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(endDate.getTime())
+    ) {
+      alert("Please enter valid event dates.");
+      return;
+    }
+
+    if (endDate < startDate) {
+      alert("Event end date cannot be earlier than the start date.");
+      return;
+    }
+
+    // Validate required rates
+    if (
+      activationRate.trim() === "" ||
+      manpowerRate.trim() === "" ||
+      licenceFeeRate.trim() === "" ||
+      gstRate.trim() === ""
+    ) {
       alert(
-        "Event end date cannot be earlier than the event start date."
+        "Please enter Activation, Manpower, Licence Fee, and GST rates."
       );
       return;
     }
 
+    // Convert input values to numbers
     const numericValues = {
-      topUps: Number(topUps || 0),
+      topups: Number(topUps || 0),
       sales: Number(sales || 0),
       devices: Number(devices || 0),
       days: Number(days || 1),
+
       card: Number(card || 0),
       cash: Number(cash || 0),
       upi: Number(upi || 0),
+
       activations: Number(activations || 0),
+      activationRate: Number(activationRate),
+
       manPower: Number(manPower || 0),
+      manpowerRate: Number(manpowerRate),
+
+      licenceFeeRate: Number(licenceFeeRate),
+      gstRate: Number(gstRate),
     };
 
-    // Validate numeric values
+    // Validate numeric inputs
     for (const [field, value] of Object.entries(numericValues)) {
       if (!Number.isFinite(value) || value < 0) {
         alert(`${field} must be a valid non-negative number.`);
@@ -147,6 +197,16 @@ export default function Admin({ onLogout }) {
       }
     }
 
+    // Validate percentages
+    if (
+      numericValues.licenceFeeRate > 100 ||
+      numericValues.gstRate > 100
+    ) {
+      alert("Licence Fee and GST rates cannot exceed 100%.");
+      return;
+    }
+
+    // Validate whole numbers
     if (!Number.isInteger(numericValues.devices)) {
       alert("Devices must be a whole number.");
       return;
@@ -168,7 +228,7 @@ export default function Admin({ onLogout }) {
       return;
     }
 
-    // Data sent to backend
+    // Complete report payload
     const formData = {
       clubName: clubName.trim(),
       eventId: eventId.trim(),
@@ -180,19 +240,32 @@ export default function Admin({ onLogout }) {
     try {
       setLoading(true);
 
+      console.log("Submitting report:", formData);
+
+      // This endpoint creates a NEW report.
       const response = await api.post("/admin", formData);
 
-      if (response.data.success) {
+      if (response.data?.success) {
+        console.log(
+          "Saved report returned by backend:",
+          response.data.report
+        );
+
         alert("Report saved successfully!");
 
         resetForm();
 
         await fetchHistory();
       } else {
-        alert(response.data.message || "Unable to save report.");
+        alert(
+          response.data?.message || "Unable to save report."
+        );
       }
     } catch (error) {
-      console.error("Save report error:", error);
+      console.error(
+        "Save report error:",
+        error.response?.data || error.message
+      );
 
       alert(
         error.response?.data?.message ||
@@ -203,11 +276,22 @@ export default function Admin({ onLogout }) {
     }
   };
 
-
-
+  // Format date
   const formatDate = (date) => {
-    if (!date) {
-      return "-";
+    if (!date) return "-";
+
+    const dateString = String(date);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split("-");
+
+      const monthName = new Date(
+        `${dateString}T00:00:00`
+      ).toLocaleDateString("en-IN", {
+        month: "short",
+      });
+
+      return `${day} ${monthName} ${year}`;
     }
 
     const parsedDate = new Date(date);
@@ -220,18 +304,32 @@ export default function Admin({ onLogout }) {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      timeZone: "UTC",
     });
   };
 
-  
-
+  // View selected report
   const handleView = async (id) => {
+    if (!id) {
+      alert("Report ID is missing.");
+      return;
+    }
+
     try {
       const response = await api.get(`/admin/${id}`);
 
-      if (response.data.success) {
-        const selectedReport = response.data.data;
+      // Controller returns { success: true, report: {...} }
+      const selectedReport =
+        response.data?.report ?? response.data?.data;
+
+      if (response.data?.success && selectedReport) {
+        console.log("Selected report:", selectedReport);
+
+        console.log("Selected report rates:", {
+          activationRate: selectedReport.activationRate,
+          manpowerRate: selectedReport.manpowerRate,
+          licenceFeeRate: selectedReport.licenceFeeRate,
+          gstRate: selectedReport.gstRate,
+        });
 
         navigate("/report", {
           state: {
@@ -239,43 +337,51 @@ export default function Admin({ onLogout }) {
           },
         });
       } else {
-        alert("Unable to load the selected report.");
+        alert(
+          response.data?.message ||
+            "Unable to load the selected report."
+        );
       }
     } catch (error) {
-      console.error("View report error:", error);
+      console.error(
+        "View report error:",
+        error.response?.data || error.message
+      );
 
       alert(
         error.response?.data?.message ||
-          "Unable to open the report."
+          "Unable to open the report. Please check the server connection."
       );
     }
   };
 
-  
-
+  // Delete report
   const handleDelete = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this report?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const response = await api.delete(`/admin/${id}`);
 
-      if (response.data.success) {
+      if (response.data?.success) {
         setHistory((previousHistory) =>
           previousHistory.filter((item) => item._id !== id)
         );
 
         alert("Report deleted successfully.");
       } else {
-        alert(response.data.message || "Unable to delete report.");
+        alert(
+          response.data?.message || "Unable to delete report."
+        );
       }
     } catch (error) {
-      console.error("Delete report error:", error);
+      console.error(
+        "Delete report error:",
+        error.response?.data || error.message
+      );
 
       alert(
         error.response?.data?.message ||
@@ -284,8 +390,6 @@ export default function Admin({ onLogout }) {
     }
   };
 
-  
-
   return (
     <div className="admin-page">
       {/* Header */}
@@ -293,9 +397,22 @@ export default function Admin({ onLogout }) {
         <h1>Club Management</h1>
 
         <div className="admin-actions">
-          <Link to="/report" className="admin-report-link">
-            View Report
-          </Link>
+          <button
+            type="button"
+            className="admin-report-link"
+            onClick={() => {
+              if (history.length === 0) {
+                alert(
+                  "No reports available. Please create a report first."
+                );
+                return;
+              }
+
+              handleView(history[0]._id);
+            }}
+          >
+            View Latest Report
+          </button>
 
           <button
             type="button"
@@ -308,14 +425,12 @@ export default function Admin({ onLogout }) {
       </header>
 
       <div className="admin-content">
-        
+        {/* Create Report Form */}
         <form className="admin-form" onSubmit={handleSubmit}>
           <h2>Create Club Report</h2>
 
-
           <div className="form-group">
             <label htmlFor="clubName">Club Name</label>
-
             <input
               type="text"
               id="clubName"
@@ -328,7 +443,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="eventId">Event ID</label>
-
             <input
               type="text"
               id="eventId"
@@ -339,10 +453,8 @@ export default function Admin({ onLogout }) {
             />
           </div>
 
-
           <div className="form-group">
             <label htmlFor="eventDate">Event Start Date</label>
-
             <input
               type="date"
               id="eventDate"
@@ -354,25 +466,22 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="eventEndDate">Event End Date</label>
-
             <input
               type="date"
               id="eventEndDate"
               value={eventEndDate}
-              onChange={(e) => setEventEndDate(e.target.value)}
               min={eventDate || undefined}
+              onChange={(e) => setEventEndDate(e.target.value)}
               required
             />
           </div>
 
           <hr />
 
-
           <h3>Sales Details</h3>
 
           <div className="form-group">
             <label htmlFor="topUps">Top Ups</label>
-
             <input
               type="number"
               id="topUps"
@@ -386,7 +495,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="sales">Sales</label>
-
             <input
               type="number"
               id="sales"
@@ -400,7 +508,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="devices">Devices</label>
-
             <input
               type="number"
               id="devices"
@@ -414,7 +521,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="days">Days</label>
-
             <input
               type="number"
               id="days"
@@ -428,12 +534,10 @@ export default function Admin({ onLogout }) {
 
           <hr />
 
-          
           <h3>Payment Details</h3>
 
           <div className="form-group">
             <label htmlFor="card">Card</label>
-
             <input
               type="number"
               id="card"
@@ -447,7 +551,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="cash">Cash</label>
-
             <input
               type="number"
               id="cash"
@@ -461,7 +564,6 @@ export default function Admin({ onLogout }) {
 
           <div className="form-group">
             <label htmlFor="upi">UPI</label>
-
             <input
               type="number"
               id="upi"
@@ -475,14 +577,12 @@ export default function Admin({ onLogout }) {
 
           <hr />
 
-
           <h3>Activation &amp; Manpower Details</h3>
 
           <div className="form-group">
             <label htmlFor="activations">
               Activations (Quantity)
             </label>
-
             <input
               type="number"
               id="activations"
@@ -493,15 +593,26 @@ export default function Admin({ onLogout }) {
               placeholder="Enter number of activations"
               required
             />
+          </div>
 
-            <small>
-              Fixed rate: ₹{ACTIVATION_RATE} per activation
-            </small>
+          <div className="form-group">
+            <label htmlFor="activationRate">
+              Activation Rate (₹ per activation)
+            </label>
+            <input
+              type="number"
+              id="activationRate"
+              min="0"
+              step="0.001"
+              value={activationRate}
+              onChange={(e) => setActivationRate(e.target.value)}
+              placeholder="Enter activation rate"
+              required
+            />
           </div>
 
           <div className="form-group">
             <label htmlFor="manPower">Manpower (Quantity)</label>
-
             <input
               type="number"
               id="manPower"
@@ -512,17 +623,59 @@ export default function Admin({ onLogout }) {
               placeholder="Enter manpower quantity"
               required
             />
-
-            <small>
-              Fixed rate: ₹
-              {MANPOWER_RATE.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}{" "}
-              per manpower unit
-            </small>
           </div>
 
+          <div className="form-group">
+            <label htmlFor="manpowerRate">
+              Manpower Rate (₹ per unit)
+            </label>
+            <input
+              type="number"
+              id="manpowerRate"
+              min="0"
+              step="0.01"
+              value={manpowerRate}
+              onChange={(e) => setManpowerRate(e.target.value)}
+              placeholder="Enter manpower rate"
+              required
+            />
+          </div>
+
+          <hr />
+
+          <h3>Fee &amp; Tax Rates</h3>
+
+          <div className="form-group">
+            <label htmlFor="licenceFeeRate">
+              Licence Fee Rate (%)
+            </label>
+            <input
+              type="number"
+              id="licenceFeeRate"
+              min="0"
+              max="100"
+              step="0.01"
+              value={licenceFeeRate}
+              onChange={(e) => setLicenceFeeRate(e.target.value)}
+              placeholder="Enter licence fee percentage"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="gstRate">GST Rate (%)</label>
+            <input
+              type="number"
+              id="gstRate"
+              min="0"
+              max="100"
+              step="0.01"
+              value={gstRate}
+              onChange={(e) => setGstRate(e.target.value)}
+              placeholder="Enter GST percentage"
+              required
+            />
+          </div>
 
           <button
             type="submit"
@@ -533,7 +686,7 @@ export default function Admin({ onLogout }) {
           </button>
         </form>
 
-
+        {/* Report History */}
         <section className="history-section">
           <div className="history-heading">
             <h2>Report History</h2>

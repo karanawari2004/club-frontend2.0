@@ -1,5 +1,4 @@
 
-
 .report-page {
   min-height: 100vh;
   padding: 22px 16px;
@@ -60,8 +59,12 @@
   background: #244b78;
 }
 
+.report-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 
-
+/* Payslip container */
 .payslip {
   width: 100%;
   max-width: 460px;
@@ -72,8 +75,7 @@
   font-family: Arial, Helvetica, sans-serif;
 }
 
-
-
+/* Logo */
 .payslip-brand {
   display: flex;
   flex-direction: column;
@@ -90,8 +92,6 @@
   line-height: 1.1;
 }
 
-/* PayNthra in blue */
-
 .paynthra-name {
   color: #174ea6;
   font-family: Arial, Helvetica, sans-serif;
@@ -101,8 +101,7 @@
   margin-bottom: 3px;
 }
 
-/* ATOMX text styling */
-
+/* ATOMX logo styles */
 .atomx-text-logo {
   display: inline-flex;
   align-items: center;
@@ -115,7 +114,6 @@
   line-height: 1.2;
   white-space: nowrap;
 }
-
 
 .atomx-name,
 .atomx-highlight {
@@ -130,6 +128,7 @@
   letter-spacing: 1.2px;
 }
 
+/* Payslip heading */
 .payslip-heading {
   margin: 3px 0 4px;
   text-align: center;
@@ -155,10 +154,9 @@
   overflow-wrap: anywhere;
 }
 
-
-
+/* Table */
 .payslip-table {
-  width: 90%;
+  width: 70%;
   max-width: 100%;
   margin: 0 auto;
   border-collapse: collapse;
@@ -168,6 +166,7 @@
   line-height: 1.25;
 }
 
+/* Table cells */
 .payslip-table th,
 .payslip-table td {
   border: 1px solid #aaa;
@@ -176,19 +175,19 @@
   overflow-wrap: anywhere;
 }
 
+/* Column widths: Child 1 = 55%, Child 2 = 45% */
 .payslip-table th:first-child,
 .payslip-table td:first-child {
-  width: 50%;
+  width: 55%;
   text-align: left;
 }
 
-.payslip-table th:last-child,
-.payslip-table td:last-child {
-  width: 50%;
+.payslip-table th:nth-child(2),
+.payslip-table td:nth-child(2) {
+  width: 45%;
 }
 
-/* Grey section headings */
-
+/* Section headings */
 .payslip-table .table-heading th,
 .payslip-table .section-heading th {
   background: #a6a6a6;
@@ -197,11 +196,7 @@
   text-align: left;
 }
 
-.payslip-table .table-heading th {
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-
+.payslip-table .table-heading th,
 .payslip-table .section-heading th {
   padding-top: 8px;
   padding-bottom: 8px;
@@ -213,14 +208,11 @@
 }
 
 /* Amount alignment */
-
 .payslip-table .report-amount {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-
-
 
 .report-label {
   font-weight: 400;
@@ -235,19 +227,16 @@
   overflow-wrap: anywhere;
 }
 
-
 .payslip-table .bold-row td {
   font-weight: 700;
 }
-
 
 .payslip-table .payable-row td {
   background: #a6a6a6;
   font-weight: 700;
 }
 
-
-
+/* Footer */
 .payslip-footer {
   margin: 12px 0 0;
   color: #626262;
@@ -265,8 +254,7 @@
   font-size: 8px;
 }
 
-
-
+/* Bottom action */
 .report-bottom-actions {
   width: 100%;
   max-width: 460px;
@@ -279,8 +267,7 @@
   text-align: center;
 }
 
-
-
+/* Empty report */
 .report-empty {
   width: 100%;
   max-width: 460px;
@@ -306,8 +293,7 @@
   max-width: 100%;
 }
 
-
-
+/* Mobile */
 @media screen and (max-width: 520px) {
   .report-page {
     padding: 12px 8px;
@@ -361,8 +347,9 @@
     font-size: 21px;
   }
 
+  /* Keep the table width on mobile */
   .payslip-table {
-    width: 94%;
+    width: 70%;
     max-width: 100%;
     font-size: 9px;
   }
@@ -405,8 +392,7 @@
   }
 }
 
-
-
+/* Very small mobile screens */
 @media screen and (max-width: 350px) {
   .report-page {
     padding: 8px 5px;
@@ -439,7 +425,7 @@
   }
 
   .payslip-table {
-    width: 94%;
+    width: 70%;
     font-size: 8px;
   }
 
@@ -461,8 +447,7 @@
   }
 }
 
-
-
+/* Print */
 @media print {
   @page {
     size: A4 portrait;
@@ -500,8 +485,6 @@
     print-color-adjust: exact;
   }
 
-  
-
   .paynthra-name {
     color: #174ea6 !important;
     -webkit-print-color-adjust: exact;
@@ -515,10 +498,22 @@
     print-color-adjust: exact;
   }
 
+  /* Keep the same table width in print */
   .payslip-table {
-    width: 94%;
+    width: 70% !important;
     max-width: 100%;
     margin: 0 auto;
+  }
+
+  /* Keep both column widths consistent in print */
+  .payslip-table th:first-child,
+  .payslip-table td:first-child {
+    width: 55% !important;
+  }
+
+  .payslip-table th:nth-child(2),
+  .payslip-table td:nth-child(2) {
+    width: 45% !important;
   }
 
   .payslip-table,
